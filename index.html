@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steganography - Hide, Read, and Edit Message in Image</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.0.2/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.1/gsap.min.js"></script>
+
+
+    <style>
+        body { 
+            padding-top: 20px; 
+            background: linear-gradient(135deg, #6a11cb, #2575fc); /* Gradient background */
+            color: white; /* Text color for better visibility on dark background */
+        }
+    
+        #encoded-image, #message-output, #edit-section, #hide-image-preview, #read-image-preview {
+            margin-top: 20px;
+            display: none;
+        }
+    
+        #read-section { display: none; }
+    
+        img.preview {
+            max-width: 43%;
+            height: auto;
+            border: 1px solid #ddd;
+            padding: 5px;
+            border-radius: 4px;
+        }
+    
+        /* Button styling with gradient */
+        .btn-primary {
+            background: linear-gradient(135deg, #ff7e5f, #feb47b); /* Gradient for hide button */
+            border: none;
+        }
+    
+        .btn-secondary {
+            background: linear-gradient(135deg, #6a11cb, #2575fc); /* Gradient for read button */
+            border: none;
+        }
+    
+        .btn-warning {
+            background: linear-gradient(135deg, #ff9a8b, #ff6a88); /* Gradient for save edit button */
+            border: none;
+        }
+    
+        /* Gradient on input fields (optional) */
+        input.form-control, textarea.form-control {
+            background: linear-gradient(145deg, #ffffff, #f1f1f1); /* Gradient background for inputs */
+            border: 1px solid #ccc;
+            color: #333;
+        }
+    
+        input[type="password"] {
+            background: linear-gradient(145deg, #ffffff, #f9f9f9); /* Gradient background for password inputs */
+        }
+    
+        input[type="file"] {
+            background: linear-gradient(145deg, #ffffff, #f1f1f1); /* Gradient background for file input */
+        }
+    
+    </style>
+    <style>
+        body { 
+            padding-top: 20px; 
+            background: linear-gradient(135deg, #702fb5, #2c0804c9); /* Gradient background */
+            color: white; /* Text color for better visibility on dark background */
+        }
+    
+        #encoded-image, #message-output, #edit-section, #hide-image-preview, #read-image-preview {
+            margin-top: 20px;
+            display: none;
+        }
+    
+        #read-section { display: none; }
+    
+        img.preview {
+            max-width: 43%;
+            height: auto;
+            border: 1px solid #ddd;
+            padding: 5px;
+            border-radius: 4px;
+        }
+    
+        /* Button styling with gradient */
+        .btn-primary {
+            background: linear-gradient(135deg, #ff7e5f, #feb47b); /* Gradient for hide button */
+            border: none;
+        }
+    
+        .btn-secondary {
+            background: linear-gradient(135deg, #6a11cb, #2575fc); /* Gradient for read button */
+            border: none;
+        }
+    
+        .btn-warning {
+            background: linear-gradient(135deg, #ff9a8b, #ff6a88); /* Gradient for save edit button */
+            border: none;
+        }
+    
+        /* Gradient on input fields (optional) */
+        input.form-control, textarea.form-control {
+            background: linear-gradient(145deg, #ffffff, #f1f1f1); /* Gradient background for inputs */
+            border: 1px solid #ccc;
+            color: #333;
+        }
+    
+        input[type="password"] {
+            background: linear-gradient(145deg, #ffffff, #f9f9f9); /* Gradient background for password inputs */
+        }
+    
+        input[type="file"] {
+            background: linear-gradient(145deg, #ffffff, #f1f1f1); /* Gradient background for file input */
+        }
+    
+
+         /* Instructions Box */
+         .instructions {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .instructions h3 {
+            margin-top: 0;
+        }
+        #qr-code-container{margin-top: -29px;
+    margin-left: 418px;
+}
+#cursor {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background-color: rgb(235, 209, 41);  /* The point that will follow the cursor */
+    border-radius: 50%;
+    pointer-events: none; /* So the cursor doesn't interfere with mouse events */
+}
+
+footer {
+            margin-top: auto;  /* This pushes the footer to the bottom of the page */
+            text-align: center;
+            font-size: 14px;
+            color: #fffdfd;
+            padding: 10px 0;
+            width: 100%;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+      <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // GSAP animation for buttons
+            const buttons = document.querySelectorAll(".btn");
+            buttons.forEach(button => {
+                // Hover animation for all buttons
+                gsap.fromTo(button, 
+                    { scale: 1 }, 
+                    { 
+                        scale: 1.1, 
+                        duration: 0.3, 
+                        ease: "power1.out", 
+                        paused: true,
+                        repeat: -1,
+                        yoyo: true,
+                        onStart: () => gsap.to(button, { backgroundColor: "#2980b9", duration: 0.3 })
+                    }
+                );
+
+                // Click animation for buttons (scale and color change)
+                button.addEventListener("click", () => {
+                    gsap.to(button, { 
+                        scale: 0.9, 
+                        backgroundColor: "#e74c3c", 
+                        duration: 0.3, 
+                        ease: "power2.inOut",
+                        onComplete: function () {
+                            gsap.to(button, { scale: 1, backgroundColor: "#3498db", duration: 0.3 });
+                        }
+                    });
+                });
+
+                // Hover effect to trigger the GSAP hover animation
+                button.addEventListener("mouseenter", () => gsap.to(button, { scale: 1.1 }));
+                button.addEventListener("mouseleave", () => gsap.to(button, { scale: 1 }));
+            });
+        });
+    </script>
+    <div id="cursor"></div>
+
+    <div class="container">
+        <h1 class="text-center">Hide, Read, and Edit Message in Image (Password Protected)</h1>
+
+        <!-- Hide Message Section -->
+        <div class="row" id="hide-section">
+            <div class="col-md-6">
+                <h2>Select an Image:</h2>
+                <input type="file" id="image-input" class="form-control" accept="image/*">
+                <button id="delete-image-button" class="btn btn-danger mt-2">Delete Image</button>
+                <img id="hide-image-preview" class="preview" alt="Image Preview">
+            </div>
+            <div class="col-md-6">
+                <h2>Enter Message to Hide:</h2>
+                <textarea id="message-input" class="form-control" rows="6" placeholder="Enter your secret message here"></textarea>
+                <h2>Password:</h2>
+                <input type="password" id="password-input" class="form-control" placeholder="Enter a password to secure the message">
+                <button id="hide-button" class="btn btn-primary mt-2">Hide Message</button>
+                <button id="show-read-section" class="btn btn-secondary mt-2">Read Message</button>
+
+            </div>
+        </div>
+
+        <!-- Download Image Section -->
+        <div id="encoded-image" class="mt-4">
+            <h2>Download the Image with Hidden Message:</h2>
+            <a id="download-link" href="#" class="btn btn-success" download="encoded-image.png">Download Image</a>
+        </div>
+
+        <!-- Read Message Section -->
+        <div id="read-section">
+            <h2>Read Hidden Message</h2>
+            <div class="row">
+                <div class="col-md-6">
+                    <h2>Select Encoded Image:</h2>
+                    <input type="file" id="read-image-input" class="form-control" accept="image/*">
+                    <button id="delete-encoded-image-button" class="btn btn-danger mt-2">Delete Image</button>
+                    <img id="read-image-preview" class="preview" alt="Encoded Image Preview">
+                </div>
+                <div class="col-md-6">
+                    <h2>Password:</h2>
+                    <input type="password" id="read-password-input" class="form-control" placeholder="Enter password to read the message">
+                    <button id="read-button" class="btn btn-secondary mt-2">Read Message</button>
+                    <div id="qr-code-container"></div>
+                    
+                </div>
+            </div>
+            
+            <div id="message-output" class="mt-4">
+                <h2>Decoded Message:</h2>
+                <textarea id="decoded-message" class="form-control" rows="6" readonly></textarea>
+            </div>
+        </div>
+
+        <!-- Edit Message Section (Optional) -->
+        <div id="edit-section">
+            <h2>Edit Hidden Message</h2>
+            <textarea id="edit-message-input" class="form-control" rows="6"></textarea>
+            <h2>Enter Password:</h2>
+            <input type="password" id="edit-password-input" class="form-control" placeholder="Re-enter password to secure the new message">
+            <button id="save-edit-button" class="btn btn-warning mt-2">Save Edited Message and Download</button>
+        </div>
+    </div>
+      <!-- Instructions Section -->
+      <div class="container mt-5">
+        <h2 class="text-center">How to Use</h2>
+        <div class="row">
+            <div class="col-md-6">
+                <h3>Hide a Message in an Image:</h3>
+                <ul>
+                    <li>Select an image you want to hide a message in by clicking the "Choose File" button.</li>
+                    <li>Enter the secret message you want to hide in the text area.</li>
+                    <li>Set a password to secure the hidden message. This password will be required to read or edit the message later.</li>
+                    <li>Click the "Hide Message" button to embed the message into the image.</li>
+                    <li>Once the message is successfully hidden, you can download the modified image by clicking the "Download Image" button.</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h3>Read a Hidden Message from an Image:</h3>
+                <ul>
+                    <li>Select an image that has a hidden message by clicking the "Choose File" button under the "Read Message" section.</li>
+                    <li>Enter the password you used to hide the message.</li>
+                    <li>Click the "Read Message" button to decode the hidden message from the image.</li>
+                    <li>If the password is correct, the hidden message will be displayed in the text area.</li>
+                </ul>
+            </div>
+        </div>
+        <!-- Footer with All Rights Reserved text -->
+        <footer>
+            <p>© 2024 All Rights Reserved By Deependra Singh, Ayushman Gupta, Shivanshu Kesheri</p>
+        </footer>
+    </div>
+
+    <script>
+        function loadImagePreview(inputId, previewId) {
+            const input = document.getElementById(inputId);
+            const preview = document.getElementById(previewId);
+
+            input.addEventListener('change', function () {
+                const file = input.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        preview.src = e.target.result;
+                        preview.style.display = "block";
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // *******************************************************
+
+        // Function to load the image from the input file and display preview
+        function loadImage(file, previewElementId) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const preview = document.getElementById(previewElementId);
+                preview.src = e.target.result;
+                preview.style.display = "block";
+            };
+            if (file) {
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Handle the image preview for hiding message
+        document.getElementById("image-input").addEventListener("change", function (event) {
+            const file = event.target.files[0];
+            if (file) {
+                loadImage(file, "hide-image-preview");
+            }
+        });
+
+        // Handle the image preview for reading message
+        document.getElementById("read-image-input").addEventListener("change", function (event) {
+            const file = event.target.files[0];
+            if (file) {
+                loadImage(file, "read-image-preview");
+            }
+        });
+
+        // Clear the file input and hide preview for hide-section
+        document.getElementById("delete-image-button").addEventListener("click", function () {
+            const imageInput = document.getElementById("image-input");
+            imageInput.value = "";  // Clear the file input
+            document.getElementById("hide-image-preview").style.display = "none";  // Hide the preview
+        });
+
+        // Clear the file input and hide preview for read-section
+        document.getElementById("delete-encoded-image-button").addEventListener("click", function () {
+            const imageInput = document.getElementById("read-image-input");
+            imageInput.value = "";  // Clear the file input
+            document.getElementById("read-image-preview").style.display = "none";  // Hide the preview
+        });
+        // *******************************************************
+
+        // Initialize image previews
+        loadImagePreview("image-input", "hide-image-preview");
+        loadImagePreview("read-image-input", "read-image-preview");
+
+        // Handle Hide Message functionality
+        document.getElementById("hide-button").addEventListener("click", function () {
+            const imageInput = document.getElementById("image-input").files[0];
+            const message = document.getElementById("message-input").value;
+            const password = document.getElementById("password-input").value;
+
+            if (!imageInput || !message || password.length < 4) {
+                alert("Please ensure image, message, and a password of at least 4 characters are provided.");
+                return;
+            }
+
+            // Placeholder for encodeMessage function (implement steganography & encryption logic)
+            const encodedImageURL = "data:image/png;base64,..."; // Example URL after encoding
+            document.getElementById("encoded-image").style.display = "block";
+            document.getElementById("download-link").href = encodedImageURL;
+        });
+
+        // Handle Read Message functionality
+        document.getElementById("read-button").addEventListener("click", function () {
+            const password = document.getElementById("read-password-input").value;
+            const imageInput = document.getElementById("read-image-input").files[0];
+
+            if (!imageInput || password.length < 4) {
+                alert("Please select an encoded image and enter a password.");
+                return;
+            }
+
+            // Placeholder for decodeMessage function (implement decoding & decryption logic)
+            document.getElementById("decoded-message").value = "Decoded message text goes here";
+        });
+
+        // Toggle visibility of read section
+        document.getElementById("show-read-section").addEventListener("click", function () {
+            document.getElementById("hide-section").style.display = "none";
+            document.getElementById("read-section").style.display = "block";
+        });
+
+
+
+        
+        // Function to load the image from the input file and display preview
+        function loadImage(file, callback, previewElementId) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const img = new Image();
+                img.onload = function () {
+                    callback(img);
+                    
+                };
+                img.src = e.target.result;
+                // Display the image preview
+                const preview = document.getElementById(previewElementId);
+                preview.src = e.target.result;
+                preview.style.display = "block";
+            };
+            if (file) {
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Function to encode the message into the image using LSB
+        function encodeMessage(image, message, password) {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            canvas.width = image.width;
+            canvas.height = image.height;
+            ctx.drawImage(image, 0, 0);
+
+            // Encrypt the message with the password (AES)
+            const encryptedMessage = CryptoJS.AES.encrypt(message, password).toString();
+
+            // Convert encrypted message to binary
+            let binaryMessage = "";
+            for (let i = 0; i < encryptedMessage.length; i++) {
+                binaryMessage += encryptedMessage.charCodeAt(i).toString(2).padStart(8, "0");
+            }
+
+            // Add the encrypted binary message into the image's pixel data (using LSB)
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            let dataIndex = 0;
+
+            for (let i = 0; i < binaryMessage.length; i++) {
+                if (dataIndex * 4 + 2 >= data.length) {
+                    alert("The message is too long to be hidden in this image.");
+                    break;  // Prevent exceeding image data
+                }
+                const colorIndex = dataIndex * 4 + 2; // Blue channel
+                // Set the least significant bit of the blue channel to hide the message
+                if (binaryMessage[i] === "1") {
+                    data[colorIndex] |= 1;  // Set LSB to 1
+                } else {
+                    data[colorIndex] &= 0xFE;  // Set LSB to 0
+                }
+                dataIndex++;
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+            return canvas.toDataURL("image/png");
+        }
+// Function to decode the message from the image using LSB
+function decodeMessage(image, password) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    ctx.drawImage(image, 0, 0);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    let binaryMessage = "";
+
+    // Extract the LSB from the blue channel of the image
+    for (let i = 0; i < data.length; i += 4) {
+        const colorIndex = i + 2; // Blue channel
+        binaryMessage += (data[colorIndex] & 1).toString();  // Extract LSB
+    }
+
+    // Convert the binary message to text (8 bits per character)
+    let encryptedMessage = "";
+    for (let i = 0; i < binaryMessage.length; i += 8) {
+        const byte = binaryMessage.slice(i, i + 8);
+        encryptedMessage += String.fromCharCode(parseInt(byte, 2));
+    }
+
+    // Decrypt the message with the password
+    try {
+        const decryptedMessage = CryptoJS.AES.decrypt(encryptedMessage, password).toString(CryptoJS.enc.Utf8);
+
+        // Check if the decrypted message is empty or invalid
+        if (!decryptedMessage) {
+            throw new Error("Incorrect password or no message found.");
+        }
+
+        return decryptedMessage; // Return the decrypted message if password is correct
+    } catch (error) {
+        // Return an error message if decryption fails
+        return "Error decoding message or incorrect password.";
+    }
+}
+
+// Event listener for the Read Message button
+document.getElementById("read-button").addEventListener("click", function () {
+    const imageInput = document.getElementById("read-image-input").files[0];
+    const passwordInput = document.getElementById("read-password-input").value;
+
+    // Validate password length
+    if (passwordInput.length < 4) {
+        alert("Password must be at least 4 characters long.");
+        return;
+    }
+
+    if (!imageInput) {
+        alert("Please select an encoded image.");
+        return;
+    }
+
+    if (!passwordInput) {
+        alert("Please enter the password.");
+        return;
+    }
+
+    // Load the image and decode the message
+    loadImage(imageInput, function (image) {
+        // Decode the message from the image using the password
+        const decodedMessage = decodeMessage(image, passwordInput);
+
+        // Debugging: Log the decoded message to check if it's being decoded correctly
+        console.log("Decoded Message:", decodedMessage);
+
+        // Display the decoded message or error message
+        const decodedMessageBox = document.getElementById("decoded-message");
+
+        // Ensure the decoded message is being displayed
+        if (decodedMessage === "Password is Incorrect! please enter the correct password.") {
+            alert(decodedMessage);  // Display alert if password is incorrect
+        } else if (decodedMessage.trim() === "") {
+            alert("No message found in the image."); // If no message is found
+        } else {
+            // If message is decoded correctly, display it in the decoded message box
+            document.getElementById("message-output").style.display = "block";  // Make output visible
+            decodedMessageBox.value = decodedMessage;  // Set the decoded message in the textarea
+        }
+
+        // If the message is decoded correctly, generate the QR code for the original message
+        if (decodedMessage !== "Password is Incorrect! please enter the correct password." && decodedMessage.trim() !== "") {
+            generateQRCode(decodedMessage);  // Generate QR Code for the decoded message
+        }
+    }, "read-image-preview");
+});
+
+// Function to generate and display the QR code
+function generateQRCode(message) {
+    // Clear any existing QR code before generating a new one
+    const qrCodeContainer = document.getElementById("qr-code-container");
+    qrCodeContainer.innerHTML = '';  // Clear previous QR code
+
+    // Use the QRCode library to generate a QR code from the decoded message
+    QRCode.toDataURL(message, { width: 200, height: 200 }, function (err, url) {
+        if (err) {
+            console.error("Error generating QR Code:", err);
+            return;
+        }
+
+        // Create an image element for the QR code
+        const qrCodeImg = document.createElement("img");
+        qrCodeImg.src = url;
+        qrCodeImg.alt = "QR Code of Decoded Message";
+
+        // Append the new QR code to the DOM container
+        qrCodeContainer.appendChild(qrCodeImg);
+    });
+}
+
+document.getElementById("hide-button").addEventListener("click", function () {
+    const imageInput = document.getElementById("image-input").files[0];
+    const messageInput = document.getElementById("message-input").value.trim();
+    const passwordInput = document.getElementById("password-input").value;
+
+    // Validate password length
+    if (passwordInput.length < 4) {
+        alert("Password must be at least 4 characters long.");
+        return;
+    }
+
+    if (!imageInput) {
+        alert("Please select an image.");
+        return;
+    }
+    if (!messageInput) {
+        alert("Please enter a message you want to hide.");
+        return;
+    }
+
+    loadImage(imageInput, function (image) {
+        const encodedImageURL = encodeMessage(image, messageInput, passwordInput);
+        document.getElementById("encoded-image").style.display = "block";
+        document.getElementById("download-link").href = encodedImageURL;
+
+        // Show the 'Read Message' section
+        document.getElementById("read-section").style.display = "block";
+        // Hide the 'Hide Message' section
+        document.getElementById("hide-section").style.display = "none";
+    }, "hide-image-preview");
+});
+
+
+document.getElementById("read-button").addEventListener("click", function () {
+    const imageInput = document.getElementById("read-image-input").files[0];
+    const passwordInput = document.getElementById("read-password-input").value;
+
+    // Validate password length
+    if (passwordInput.length < 4) {
+        alert("Password must be at least 4 characters long.");
+        return;
+    }
+
+    if (!imageInput) {
+        alert("Please select an encoded image.");
+        return;
+    }
+    if (!passwordInput) {
+        alert("Please enter the password.");
+        return;
+    }
+
+    loadImage(imageInput, function (image) {
+        // Call the decodeMessage function and get the result
+        const decodedMessage = decodeMessage(image, passwordInput);
+        
+        // Display the decoded message or the "Incorrect password" message
+        document.getElementById("message-output").style.display = "block";
+        document.getElementById("decoded-message").value = decodedMessage;
+    }, "read-image-preview");
+});
+
+
+//******************************************************************************************
+
+// Function to toggle visibility of the read-section when "Read Message" button is clicked
+document.getElementById("show-read-section").addEventListener("click", function () {
+    // Hide the "Hide Section"
+    document.getElementById("hide-section").style.display = "none";
+
+    // Show the "Read Section"
+    document.getElementById("read-section").style.display = "block";
+});
+
+// Handle the image preview for hiding message
+document.getElementById("image-input").addEventListener("change", function (event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            document.getElementById("hide-image-preview").src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Handle the image preview for reading message
+document.getElementById("read-image-input").addEventListener("change", function (event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            document.getElementById("read-image-preview").src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Add the logic to read the hidden message when the "Read Message" button is clicked
+document.getElementById("read-message-button").addEventListener("click", function () {
+    const password = document.getElementById("read-password-input").value;
+    const imageInput = document.getElementById("read-image-input").files[0];
+    
+    if (!imageInput || !password) {
+        alert("Please select an encoded image and enter a password.");
+        return;
+    }
+
+    // Dummy decodeMessage function to simulate reading the message (replace with actual decoding logic)
+    const decodedMessage = decodeMessage(imageInput, password);
+
+    // Display the decoded message
+    document.getElementById("decoded-message").value = decodedMessage;
+});
+
+// Dummy function to simulate decoding the message
+function decodeMessage(image, password) {
+    // For now, returning a placeholder message
+    return "This is the decoded message based on the image and password!";
+}
+
+
+//********************************************************************************************
+
+
+
+
+
+// Function to encode the message into the image using LSB and generate QR code
+function encodeMessage(image, message, password) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    ctx.drawImage(image, 0, 0);
+
+    // Encrypt the message with the password (AES)
+    const encryptedMessage = CryptoJS.AES.encrypt(message, password).toString();
+
+    // Convert encrypted message to binary
+    let binaryMessage = "";
+    for (let i = 0; i < encryptedMessage.length; i++) {
+        binaryMessage += encryptedMessage.charCodeAt(i).toString(2).padStart(8, "0");
+    }
+
+    // Add the encrypted binary message into the image's pixel data (using LSB)
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    let dataIndex = 0;
+
+    for (let i = 0; i < binaryMessage.length; i++) {
+        if (dataIndex * 4 + 2 >= data.length) {
+            alert("The message is too long to be hidden in this image.");
+            break;  // Prevent exceeding image data
+        }
+        const colorIndex = dataIndex * 4 + 2; // Blue channel
+        // Set the least significant bit of the blue channel to hide the message
+        if (binaryMessage[i] === "1") {
+            data[colorIndex] |= 1;  // Set LSB to 1
+        } else {
+            data[colorIndex] &= 0xFE;  // Set LSB to 0
+        }
+        dataIndex++;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    const encodedImageURL = canvas.toDataURL("image/png");
+
+    // Generate the QR code for the original message (not the encrypted one)
+    // QRCode.toDataURL(message, { width: 200, height: 200 }, function (err, url) {
+    //     if (err) throw err;
+    //     const qrCodeImg = document.createElement("img");
+    //     qrCodeImg.src = url;
+    //     qrCodeImg.alt = "QR Code of Original Message";
+    //     document.body.appendChild(qrCodeImg);  // Append QR code to the page
+    // });
+
+    return encodedImageURL;
+}
+
+// Function to decode the message from the image using LSB
+function decodeMessage(image, password) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    ctx.drawImage(image, 0, 0);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    let binaryMessage = "";
+
+    // Extract the LSB from the blue channel of the image
+    for (let i = 0; i < data.length; i += 4) {
+        const colorIndex = i + 2; // Blue channel
+        binaryMessage += (data[colorIndex] & 1).toString();  // Extract LSB
+    }
+
+    // Convert the binary message to text (8 bits per character)
+    let encryptedMessage = "";
+    for (let i = 0; i < binaryMessage.length; i += 8) {
+        const byte = binaryMessage.slice(i, i + 8);
+        encryptedMessage += String.fromCharCode(parseInt(byte, 2));
+    }
+
+    // Decrypt the message with the password
+    try {
+        const decryptedMessage = CryptoJS.AES.decrypt(encryptedMessage, password).toString(CryptoJS.enc.Utf8);
+        
+        // If decryption is successful, return the decrypted message
+        if (decryptedMessage) {
+            return decryptedMessage;
+        } else {
+            throw new Error("Incorrect password");
+        }
+    } catch (error) {
+        // If there is an error (wrong password or other issue), return an error message
+        return "Password is Inccorect! please enter the correct password.";
+    }
+}
+
+
+
+
+    </script>
+         <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                const cursor = document.getElementById("cursor");
+    
+                document.addEventListener("mousemove", function (event) {
+                    gsap.to(cursor, {
+                        duration: 0.9,  // Increased duration for smoother movement
+                        x: event.clientX - cursor.offsetWidth / 2,
+                        y: event.clientY - cursor.offsetHeight / 2,
+                        ease: "power1.out"  // Smooth easing function
+                    });
+                });
+            });
+        </script>
+</body>
+</html>
